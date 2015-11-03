@@ -1,11 +1,17 @@
+import sys
+
 import os
 import json
 #curl 'https://app.pendo.io/api/s/<subscription>/guide?includeArchived=true' -H 'accept: application/json, text/plain, */*'  -H 'cookie: pendo.sess=<sessionid>'  > /tmp/guide.json
 
 guides = json.load(open('/tmp/guide.json', 'rb'))
+
+guideId = sys.argv[1]
+
 for guide in guides:
     #if guide['state'] == u'staged':
-    if "Pendo" in guide['name']:
+    #if "Pendo" in guide['name']:
+    if guide['id'] == guideId:
         path = guide['id']
         if not os.path.exists(path):
             os.makedirs(path)
