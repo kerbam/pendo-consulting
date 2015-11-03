@@ -56,4 +56,5 @@ for dirName, subdirList, fileList in os.walk(rootDir):
             if stepDiff.has_key('content'):
                 # extra rules locally, might just want to replace the content of upstream
                 print "updating content for guide %s" % localStepMeta['guideId']
-                print putStepContent(dirName[2:], fname[:-8], json.dumps(localStepMeta))
+                upstreamStep['content'] = localStepMeta['content']
+                print putStepContent(dirName[2:], fname[:-8], json.dumps(upstreamStep))
