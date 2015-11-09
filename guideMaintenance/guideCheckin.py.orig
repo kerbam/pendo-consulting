@@ -1,27 +1,15 @@
-import sys
 import json
 import os
 import requests
 
-def getSubscription():
-    user = os.environ.get('PENDO_USER')
-    subscription = os.environ.get('PENDO_SUBSCRIPTION')
-    assert user
-    assert subscription
-    url = "https://app.pendo.io/api/s/%s/user/%s/setting/impersonate.subscription" % (subscription, user)
-    headers = {'cookie': 'pendo.sess=%s' % getSessionId() }
-    impersonate = requests.get(url, headers = headers )
-    return json.loads(impersonate.content)['value']
-
 def getStepUrl(guideId, stepId):
-    subscription = getSubscription()
+    subscription = ''
     rootUrl = 'https://app.pendo.io/api/s/%s/guide/' % subscription
     url = "%s%s/step/%s" % (rootUrl, guideId, stepId)
     return url
 
 def getSessionId():
-    sessionId = os.environ.get('PENDO_SESS')
-    assert sessionId
+    sessionId = ''
     return sessionId
 
 def getStepContent(guideId, stepId):
@@ -53,16 +41,12 @@ def dict_diff(d1, d2, NO_KEY='<KEYNOTFOUND>'):
     diff.update({k:(NO_KEY, d2[k]) for k in list(set(d2.keys()) - set(both))})
     return diff
 
-destructive = False
-if len(sys.argv) > 1 and sys.argv[1] == 'y':
-    destructive = True
-
 rootDir = '.'
 for dirName, subdirList, fileList in os.walk(rootDir):
     for fname in fileList:
         if fname.endswith(".html"):
             step_id = fname[:-5][7:]   # drop "s-1234-" and ".html"
-            #print(getStepUrl(dirName[2:], step_id))
+            print(getStepUrl(dirName[2:], step_id))
             content = getStepContent(dirName[2:], step_id)
             upstreamStep = json.loads(content)
             localStepMeta = json.load(open("%s/%s.meta" %(dirName, fname[:-5]), 'rb'))  # use stepnum from the original filename
@@ -74,7 +58,4 @@ for dirName, subdirList, fileList in os.walk(rootDir):
                 # extra rules locally, might just want to replace the content of upstream
                 print "updating content for guide %s -> %s" % (localStepMeta['guideId'], fname)
                 upstreamStep['content'] = localStepMeta['content']
-                if destructive:
-                    print putStepContent(dirName[2:], step_id, json.dumps(upstreamStep))
-                else:
-                    print "- non-destructive mode: no changes actually uploaded."
+                print putStepContent(dirName[2:], fname[:-8], json.dumps(upstreamStep))
