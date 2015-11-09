@@ -6,7 +6,7 @@ import json
 
 guides = json.load(open('/tmp/guide.json', 'rb'))
 
-guideId = 'unknown'
+guideId = False
 
 if len(sys.argv) > 1:
     guideId = sys.argv[1]
@@ -14,9 +14,12 @@ if len(sys.argv) > 1:
 foundOne = False
 
 for guide in guides:
-    #if guide['state'] == u'staged':
-    #if "Pendo" in guide['name']:
-    if guide['id'] == guideId:
+    checkout = False
+    if guideId == "ALL":
+        checkout = True
+    elif guide['id'] == guideId:
+        checkout = True
+    if checkout:
         foundOne = True
         print "processing guide %s name = %s" % (guide['id'], guide['name'])
         path = guide['id']
@@ -31,7 +34,11 @@ for guide in guides:
                 temp_file.write(json.dumps(step))
             with open(os.path.join(path, "s-%04d-%s.html" % (stepnum, stepId)), 'w') as temp_file:
                 temp_file.write(content.encode('utf8'))
-    elif guideId == 'unknown':
+        guide.pop('steps', None)
+        with open(os.path.join(path, "guide.meta"), 'w') as temp_file:
+            temp_file.write(json.dumps(guide))
+        
+    elif not guideId:
         print "ignoring guide %s name = %s" % (guide['id'], guide['name'])
 
 if foundOne == False:
