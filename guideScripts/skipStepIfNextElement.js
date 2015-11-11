@@ -19,9 +19,9 @@ pendo._.defer(function(){setTimeout(function (){
     if (activeObj.step.seenState == 'advanced' || activeObj.step.seenState == 'dismissed') {
       return;//Step already advanced, do nothing
     } else if (results.length == 0 || !pendo._.some(results, pendo.isElementVisible)) {
-        pendo.Sizzle('._pendo-guide_')[0].style['display'] = 'none';
+        pendo.Sizzle('._pendo-guide_')[0].style['display'] = 'block';
         //TODO wrap this in a try
-        //pendo.Sizzle('._pendo-backdrop_')[0].style['display'] = 'none';
+        //pendo.Sizzle('._pendo-backdrop_')[0].style['display'] = 'block';
     } else {
         pendo.onGuideAdvanced(activeObj.step);
     }
