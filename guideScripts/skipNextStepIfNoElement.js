@@ -1,6 +1,6 @@
 pendo.Sizzle('._pendo-guide_')[0].style['display'] = 'none';
 //TODO wrap this in a try
-//pendo.Sizzle('._pendo-backdrop_')[0].style['display'] = 'none';
+pendo.Sizzle('._pendo-backdrop_')[0].style['display'] = 'none';
 (function() {
     // need to know:
     // -- this steps' index
@@ -8,22 +8,22 @@ pendo.Sizzle('._pendo-guide_')[0].style['display'] = 'none';
     var activeObj = getActiveGuide();
     var nextStep = activeObj.guide.steps[activeObj.stepIndex + 1];
 
-//TODO wrapping a setTimeout in a defer may not be redundant
 pendo._.defer(function(){setTimeout(function (){
 
     // Test next step's element to see if it is present
-    // if it is, then move to that step
+    // if it's not, skip that step.
 
     var results = pendo.Sizzle(nextStep.elementPathRule);
     // this check may not be necessary, but for good measure
     if (activeObj.step.seenState == 'advanced' || activeObj.step.seenState == 'dismissed') {
       return;//Step already advanced, do nothing
     } else if (results.length == 0 || !pendo._.some(results, pendo.isElementVisible)) {
-        pendo.Sizzle('._pendo-guide_')[0].style['display'] = 'none';
-        //TODO wrap this in a try
-        //pendo.Sizzle('._pendo-backdrop_')[0].style['display'] = 'none';
+        // in this case we want to skip 2 steps forward
+        pendo.log('advance 2 steps');
+        pendo.onGuideAdvanced({steps: 2});
     } else {
-        pendo.onGuideAdvanced(activeObj.step);
+      pendo.log('advance 1 step');
+      pendo.onGuideAdvanced(activeObj.step);
     }
 }, 1000)});
 
