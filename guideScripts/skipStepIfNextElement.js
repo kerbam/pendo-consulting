@@ -8,8 +8,7 @@ pendo.Sizzle('._pendo-guide_')[0].style['display'] = 'none';
     var activeObj = getActiveGuide();
     var nextStep = activeObj.guide.steps[activeObj.stepIndex + 1];
 
-//TODO wrapping a setTimeout in a defer may not be redundant
-pendo._.defer(function(){setTimeout(function (){
+pendo._.defer(function(){
 
     // Test next step's element to see if it is present
     // if it is, then move to that step
@@ -25,7 +24,7 @@ pendo._.defer(function(){setTimeout(function (){
     } else {
         pendo.onGuideAdvanced(activeObj.step);
     }
-}, 1000)});
+});
 
 })();
 
