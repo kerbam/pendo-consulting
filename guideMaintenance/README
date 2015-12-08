@@ -1,0 +1,21 @@
+requires environment variables with your session ID. Recommend adding these to your bashrc or creating a file which you can source on the command line (syntax is ". <filename>")
+
+export PENDO_SUBSCRIPTION=###
+export PENDO_USER=###
+export PENDO_SESS='<sessionId>'
+
+You can get the subscription and user fron the "impersonate.subscription" network call in the UI when you impersonate or unimpersonate.
+example https://app.pendo.io/api/s/<subscrptionId>/user/<userId>/setting/impersonate.subscription
+
+sessionId is available in sight settings under "Session" https://app.pendo.io/admin
+
+The script will automatically impersonate whatever you have set in the UI, but you still need to set the pendo subscription id.
+
+Syntax should be built into the script, but examples below.
+
+All commands must be run in parent directory, not guide directories
+python ./commandline.py down
+python ./commandline.py down -g <guideId>
+python ./commandline.py up -g <guideId>
+python ./commandline.py up -g <guideId> -y
+
