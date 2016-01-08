@@ -4,10 +4,12 @@ export PENDO_SUBSCRIPTION=###
 export PENDO_USER=###
 export PENDO_SESS='<sessionId>'
 
+This tool uses the "true" address of pendo application (https://pendo-io.appspot.com) due to SSL shenanigans.
+
 You can get the subscription and user fron the "impersonate.subscription" network call in the UI when you impersonate or unimpersonate.
 example https://app.pendo.io/api/s/<subscrptionId>/user/<userId>/setting/impersonate.subscription
 
-sessionId is available in sight settings under "Session" https://app.pendo.io/admin
+sessionId is available in sight settings under "Session" https://pendo-io.appspot.com/admin
 
 The script will automatically impersonate whatever you have set in the UI, but you still need to set the pendo subscription id.
 

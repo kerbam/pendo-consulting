@@ -14,7 +14,7 @@ def getSubscription():
     subscription = os.environ.get('PENDO_SUBSCRIPTION')
     assert user
     assert subscription
-    url = "https://app.pendo.io/api/s/%s/user/%s/setting/impersonate.subscription" % (subscription, user)
+    url = "https://pendo-io.appspot.com/api/s/%s/user/%s/setting/impersonate.subscription" % (subscription, user)
     headers = {'cookie': 'pendo.sess=%s' % getSessionId() }
     impersonate = requests.get(url, headers = headers )
     impersonateSubscription = json.loads(impersonate.content)['value']
@@ -28,16 +28,38 @@ def getSessionId():
     return sessionId
 
 def getGuides(subscription):
-    url = "https://app.pendo.io/api/s/%s/guide?includeArchived=true" % subscription
+    url = "https://pendo-io.appspot.com/api/s/%s/guide?includeArchived=true" % subscription
     headers = {'cookie': 'pendo.sess=%s' % getSessionId(),
                'accept': 'application/json, text/plain, */*'
               }
     guides = requests.get(url, headers = headers )
     return guides.content
 
+def getGuideUrl(guideId):
+    subscription = getSubscription()
+    rootUrl = 'https://pendo-io.appspot.com/api/s/%s/guide/' % subscription
+    url = "%s%s" % (rootUrl, guideId)
+    return url
+
+def getGuideMeta(guideId):
+    url = getGuideUrl(guideId)
+    headers = {'cookie': 'pendo.sess=%s' % getSessionId() }
+    guide = requests.get(url, headers = headers )
+    # TODO check response code and raise error
+    return guide.content
+
+def putGuideMeta(guideId, json):
+    url = getGuideUrl(guideId)
+    headers = {'cookie': 'pendo.sess=%s' % getSessionId(),
+               'Content-Type':'application/json'
+              }
+    guide = requests.put(url, headers = headers, data = json )
+    # TODO check response code and raise error
+    return guide.status_code
+
 def getStepUrl(guideId, stepId):
     subscription = getSubscription()
-    rootUrl = 'https://app.pendo.io/api/s/%s/guide/' % subscription
+    rootUrl = 'https://pendo-io.appspot.com/api/s/%s/guide/' % subscription
     url = "%s%s/step/%s" % (rootUrl, guideId, stepId)
     return url
 
@@ -109,7 +131,7 @@ def guideCheckout(guideId, jsonFilename):
     if foundOne == False:
         print "warning: never found guide matching ID %s" % guideId
 
-def guideCheckin(guideId, destructive = False):
+def guideUpload(guideId, destructive = False):
     #TODO verify regexUrlRule isn't editable, ignore for now
     skipKeys = set(['regexUrlRule', 'dismissedCount', 'uniqueDisplayedCount', 'displayedCount', 'advancedCount', 'totalDuration', 'lastUpdatedAt', 'lastUpdatedByUser'])
     # WARNING: breaks on extra files in this directory
@@ -127,7 +149,7 @@ def guideCheckin(guideId, destructive = False):
                 localStep = json.load(open("%s/%s.meta" %(dirName, fname[:-5]), 'rb'))  # use stepnum from the original filename
                 localStepContent = open("%s/%s" %(dirName, fname), 'rb')
                 localStep[u'content'] = localStepContent.read().decode('utf8')
-                strippedUpstreamStep = upstreamStep
+                strippedUpstreamStep = dict(upstreamStep)
                 for key in skipKeys.intersection(set(strippedUpstreamStep.keys())):
                     strippedUpstreamStep.pop(key)
                 for key in skipKeys.intersection(set(localStep.keys())):
@@ -138,12 +160,31 @@ def guideCheckin(guideId, destructive = False):
                     upstreamStep.update(localStep)
                     #TODO switch these to log
                     print "updating content for guide %s -> %s" % (localStep['guideId'], fname)
-                    print stepDiff
+                    pprint(stepDiff)
                     if destructive:
                         print putStepContent(dirName[2:], step_id, json.dumps(upstreamStep))
                     else:
                         print "- non-destructive mode: no changes actually uploaded."
-                    #pprint(upstreamStep)
+            elif fname == "guide.meta":
+                upstreamGuideMeta = json.loads(getGuideMeta(dirName[2:]))
+                guideMeta = json.load(open("%s/%s" %(dirName, fname), 'rb'))
+                strippedUpstreamGuideMeta = dict(upstreamGuideMeta)
+                for key in skipKeys.intersection(set(guideMeta.keys())):
+                    strippedUpstreamGuideMeta.pop(key)
+                # TODO don't compare steps right now, but likely could use this to update in one fell swoop
+                strippedUpstreamGuideMeta.pop('steps')
+                for key in skipKeys.intersection(set(guideMeta.keys())):
+                    guideMeta.pop(key)
+                metaDiff = dict_diff(guideMeta,strippedUpstreamGuideMeta)
+                if userVerify(metaDiff):
+                    upstreamGuideMeta.update(guideMeta)
+                    #TODO switch these to log
+                    print "updating meta for guide %s" % guideMeta['id']
+                    pprint(metaDiff)
+                    if destructive:
+                        print putGuideMeta(dirName[2:], json.dumps(guideMeta))
+                    else:
+                        print "- non-destructive mode: no changes actually uploaded."
 
 def userVerify(stepDiff):
     if stepDiff:
@@ -160,7 +201,7 @@ def main(args, loglevel):
   if args.action == "down" or args.action == "d":
       guideCheckout(args.guide, args.json)
   elif args.action == "up" or args.action == "u":
-      guideCheckin(args.guide, args.y)
+      guideUpload(args.guide, args.y)
   else:
     print "unrecognized action"
 
