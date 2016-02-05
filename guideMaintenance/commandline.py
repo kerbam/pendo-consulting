@@ -18,8 +18,9 @@ def getSubscription():
     headers = {'cookie': 'pendo.sess=%s' % getSessionId() }
     impersonate = requests.get(url, headers = headers )
     impersonateSubscription = json.loads(impersonate.content)['value']
-    # make sure we are not internal
-    assert impersonateSubscription
+    # if we are internal
+    if not impersonateSubscription:
+        impersonateSubscription = subscription
     return impersonateSubscription
 
 def getSessionId():
@@ -172,7 +173,11 @@ def guideUpload(guideId, destructive = False):
                 for key in skipKeys.intersection(set(guideMeta.keys())):
                     strippedUpstreamGuideMeta.pop(key)
                 # TODO don't compare steps right now, but likely could use this to update in one fell swoop
+                strippedUpstreamGuideMeta.pop('stateHistory')
                 strippedUpstreamGuideMeta.pop('steps')
+                # stateHistory is actually local after the first action
+                if guideMeta.has_key('stateHistory'):
+                    guideMeta.pop('stateHistory')
                 for key in skipKeys.intersection(set(guideMeta.keys())):
                     guideMeta.pop(key)
                 metaDiff = dict_diff(guideMeta,strippedUpstreamGuideMeta)
@@ -183,6 +188,7 @@ def guideUpload(guideId, destructive = False):
                     pprint(metaDiff)
                     if destructive:
                         print putGuideMeta(dirName[2:], json.dumps(guideMeta))
+                        #pass
                     else:
                         print "- non-destructive mode: no changes actually uploaded."
 
