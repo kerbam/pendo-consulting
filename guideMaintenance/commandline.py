@@ -118,13 +118,17 @@ def guideCheckout(guideId, jsonFilename):
                 stepnum = stepnum + 1
                 stepId = step['id']
                 content = step.pop('content')
-                with open(os.path.join(path, "%02d-%s.meta" % (stepnum, stepId)), 'w') as temp_file:
-                    temp_file.write(json.dumps(step))
+                with open(os.path.join(path, "%02d-%s.json" % (stepnum, stepId)), 'w') as temp_file:
+                    temp_file.write(json.dumps(step, indent=4))
+                with open(os.path.join(path, ".%02d-%s.json" % (stepnum, stepId)), 'w') as temp_file:
+                    temp_file.write(json.dumps(step, indent=4))
                 with open(os.path.join(path, "%02d-%s.html" % (stepnum, stepId)), 'w') as temp_file:
                     temp_file.write(content.encode('utf8'))
+                with open(os.path.join(path, ".%02d-%s.html" % (stepnum, stepId)), 'w') as temp_file:
+                    temp_file.write(content.encode('utf8'))
             guide.pop('steps', None)
-            with open(os.path.join(path, "guide.meta"), 'w') as temp_file:
-                temp_file.write(json.dumps(guide))
+            with open(os.path.join(path, "guide.json"), 'w') as temp_file:
+                temp_file.write(json.dumps(guide, indent=4))
 
         elif not guideId:
             print "ignoring guide %s name = %s" % (guide['id'], guide['name'])
@@ -132,9 +136,15 @@ def guideCheckout(guideId, jsonFilename):
     if foundOne == False:
         print "warning: never found guide matching ID %s" % guideId
 
-def guideUpload(guideId, destructive = False):
-    #TODO verify regexUrlRule isn't editable, ignore for now
+def cleanStep(step):
     skipKeys = set(['regexUrlRule', 'dismissedCount', 'uniqueDisplayedCount', 'displayedCount', 'advancedCount', 'totalDuration', 'lastUpdatedAt', 'lastUpdatedByUser'])
+    for key in skipKeys.intersection(set(step.keys())):
+        step.pop(key)
+    return step
+
+def guideUpload(guideId, destructive = False, merge = False):
+    changedSteps = set()
+    #TODO verify regexUrlRule isn't editable, ignore for now
     # WARNING: breaks on extra files in this directory
     rootDir = '.'
     for dirName, subdirList, fileList in os.walk(rootDir):
@@ -142,62 +152,76 @@ def guideUpload(guideId, destructive = False):
             if not dirName[2:] == guideId:
                 continue
         for fname in fileList:
+            # skip hidden files
+            if fname.startswith('.'):
+                continue
             if fname.endswith(".html"):
                 step_id = fname[:-5][3:]   # drop step number and ".html"
                 content = getStepContent(dirName[2:], step_id)
                 upstreamStep = json.loads(content)
                 # WARNING assumption that every html file will have a corresponding meta
-                localStep = json.load(open("%s/%s.meta" %(dirName, fname[:-5]), 'rb'))  # use stepnum from the original filename
+                localStep = json.load(open("%s/%s.json" %(dirName, fname[:-5]), 'rb'))  # use stepnum from the original filename
                 localStepContent = open("%s/%s" %(dirName, fname), 'rb')
-                localStep[u'content'] = localStepContent.read().decode('utf8')
-                strippedUpstreamStep = dict(upstreamStep)
-                for key in skipKeys.intersection(set(strippedUpstreamStep.keys())):
-                    strippedUpstreamStep.pop(key)
-                for key in skipKeys.intersection(set(localStep.keys())):
-                    localStep.pop(key)
-                stepDiff = dict_diff(localStep,strippedUpstreamStep)
-                if userVerify(stepDiff):
-                    # take upstreamStep and update only the colliding values (localStep already stripped above)
-                    upstreamStep.update(localStep)
-                    #TODO switch these to log
-                    print "updating content for guide %s -> %s" % (localStep['guideId'], fname)
-                    pprint(stepDiff)
-                    if destructive:
-                        print putStepContent(dirName[2:], step_id, json.dumps(upstreamStep))
-                    else:
+                strippedUpstreamStep = cleanStep(dict(upstreamStep))
+                strippedLocalStep = cleanStep(dict(localStep))
+                print "updating content for guide %s -> %s" % (strippedLocalStep['guideId'], fname)
+                if merge:
+                    localStepOrig = json.load(open("%s/.%s.json" %(dirName, fname[:-5]), 'rb'))
+                    stepDiff = dict_diff(localStep,localStepOrig)
+                    # TODO this only does metadata at the moment
+                    print "ONLY MERGING METADATA, content merging not supported right now"
+                    if userVerify(stepDiff):
+                        # stepDiff is a dict of differences, which means we need to interate over keys
+                        for key in stepDiff:
+                            upstreamStep[key] = localStep[key]
+                        changedSteps.add(fname[:-5])
+                        if destructive:
+                            print putStepContent(dirName[2:], step_id, json.dumps(upstreamStep))
+                elif destructive:
+                    strippedLocalStep[u'content'] = localStepContent.read().decode('utf8')
+                    stepDiff = dict_diff(strippedLocalStep,strippedUpstreamStep)
+                    if stepDiff:
+                        if userVerify(stepDiff):
+                            upstreamStep.update(strippedLocalStep)
+                            print putStepContent(dirName[2:], step_id, json.dumps(upstreamStep))
+                else:
+                    strippedLocalStep[u'content'] = localStepContent.read().decode('utf8')
+                    stepDiff = dict_diff(strippedLocalStep,strippedUpstreamStep)
+                    if stepDiff:
+                        pprint(stepDiff)
                         print "- non-destructive mode: no changes actually uploaded."
-            elif fname == "guide.meta":
+            elif fname == "guide.json":
                 upstreamGuideMeta = json.loads(getGuideMeta(dirName[2:]))
                 guideMeta = json.load(open("%s/%s" %(dirName, fname), 'rb'))
-                strippedUpstreamGuideMeta = dict(upstreamGuideMeta)
-                for key in skipKeys.intersection(set(guideMeta.keys())):
-                    strippedUpstreamGuideMeta.pop(key)
+                strippedUpstreamGuideMeta = cleanStep(dict(upstreamGuideMeta))
                 # TODO don't compare steps right now, but likely could use this to update in one fell swoop
                 strippedUpstreamGuideMeta.pop('stateHistory')
                 strippedUpstreamGuideMeta.pop('steps')
                 # stateHistory is actually local after the first action
                 if guideMeta.has_key('stateHistory'):
                     guideMeta.pop('stateHistory')
-                for key in skipKeys.intersection(set(guideMeta.keys())):
-                    guideMeta.pop(key)
+                guideMeta = cleanStep(guideMeta)
                 metaDiff = dict_diff(guideMeta,strippedUpstreamGuideMeta)
                 if userVerify(metaDiff):
-                    upstreamGuideMeta.update(guideMeta)
                     #TODO switch these to log
                     print "updating meta for guide %s" % guideMeta['id']
-                    pprint(metaDiff)
-                    if destructive:
+                    if merge:
+                        print "merge of guide meta not supported right now"
+                    elif destructive:
+                        upstreamGuideMeta.update(guideMeta)
                         print putGuideMeta(dirName[2:], json.dumps(guideMeta))
-                        #pass
                     else:
                         print "- non-destructive mode: no changes actually uploaded."
+    pprint(changedSteps)
 
 def userVerify(stepDiff):
     if stepDiff:
     # Display Difference
     # Collect and Return User Acknowledgement
+        pprint(stepDiff)
         return True
     else:
+        print "No Change!"
         return False
 
 # Gather our code in a main() function
@@ -207,7 +231,7 @@ def main(args, loglevel):
   if args.action == "down" or args.action == "d":
       guideCheckout(args.guide, args.json)
   elif args.action == "up" or args.action == "u":
-      guideUpload(args.guide, args.y)
+      guideUpload(args.guide, args.d, args.m)
   else:
     print "unrecognized action"
 
@@ -230,8 +254,12 @@ if __name__ == '__main__':
                       help="increase output verbosity",
                       action="store_true")
   parser.add_argument(
-                      "-y",
+                      "-d",
                       help = "Enter destructive mode",
+                      action="store_true")
+  parser.add_argument(
+                      "-m",
+                      help = "Enter merge mode",
                       action="store_true")
   parser.add_argument(
                       "--json",
@@ -242,10 +270,9 @@ if __name__ == '__main__':
   #                    help = "Checkout All Guides",
   #                    metavar = "ALL")
   args = parser.parse_args()
-
   if args.verbose:
     loglevel = logging.DEBUG
   else:
     loglevel = logging.INFO
-
+    logging.getLogger("requests").setLevel(logging.WARNING)
   main(args, loglevel)
