@@ -19,5 +19,5 @@ All commands must be run in parent directory, not guide directories
 python ./commandline.py down
 python ./commandline.py down -g <guideId>
 python ./commandline.py up -g <guideId>
-python ./commandline.py up -g <guideId> -y
+python ./commandline.py up -g <guideId> -d
 
