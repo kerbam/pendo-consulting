@@ -15,7 +15,7 @@ def getSubscription():
     assert user
     assert subscription
     url = "https://pendo-io.appspot.com/api/s/%s/user/%s/setting/impersonate.subscription" % (subscription, user)
-    headers = {'cookie': 'pendo.sess=%s' % getSessionId() }
+    headers = {'cookie': 'pendo.sess.web=%s' % getSessionId() }
     impersonate = requests.get(url, headers = headers )
     impersonateSubscription = json.loads(impersonate.content)['value']
     # if we are internal
@@ -72,6 +72,15 @@ def getStepContent(guideId, stepId):
     # TODO check response code and raise error
     return step.content
 
+def putSubscription(subscriptionJson):
+    url = "https://pendo-io.appspot.com/api/s/%s/subscription" % getSubscription()
+    headers = {'cookie': 'pendo.sess=%s' % getSessionId(),
+               'Content-Type':'application/json'
+              }
+    sub = requests.put(url, headers = headers, data = subscriptionJson )
+    # TODO check response code and raise error
+    return sub.status_code
+
 def putStepContent(guideId, stepId, json):
     url = getStepUrl(guideId, stepId)
     headers = {'cookie': 'pendo.sess=%s' % getSessionId(),
@@ -94,6 +103,43 @@ def dict_diff(d1, d2, NO_KEY='<KEYNOTFOUND>'):
     diff.update({k:(NO_KEY, d2[k]) for k in list(set(d2.keys()) - set(both))})
     return diff
 
+def getSubscriptionJson():
+    url = "https://pendo-io.appspot.com/api/s/%s/subscription" % getSubscription()
+    headers = {'cookie': 'pendo.sess=%s' % getSessionId() }
+    subscriptionJson = requests.get(url, headers = headers )
+    return subscriptionJson.content
+
+def launcherDown():
+    guideWidgetData = json.loads(getSubscriptionJson())['guideWidgetData']
+    path = 'launcher'
+    if not os.path.exists(path):
+        os.makedirs(path)
+    with open(os.path.join(path, "launcher.html"), 'w') as temp_file:
+        temp_file.write(guideWidgetData['html'].encode('utf8'))
+    with open(os.path.join(path, ".launcher.html"), 'w') as temp_file:
+        temp_file.write(guideWidgetData['html'].encode('utf8'))
+    with open(os.path.join(path, "launcher.css"), 'w') as temp_file:
+        temp_file.write(guideWidgetData['css'].encode('utf8'))
+    with open(os.path.join(path, "launcher.css"), 'w') as temp_file:
+        temp_file.write(guideWidgetData['css'].encode('utf8'))
+    with open(os.path.join(path, "launcher.js"), 'w') as temp_file:
+        temp_file.write(guideWidgetData['javascript'].encode('utf8'))
+    with open(os.path.join(path, "launcher.js"), 'w') as temp_file:
+        temp_file.write(guideWidgetData['javascript'].encode('utf8'))
+
+def launcherUpload(destructive = False, merge = False):
+    rootDir = '.'
+    for dirName, subdirList, fileList in os.walk(rootDir):
+        if dirName[2:] == "launcher":
+            subscriptionJson = json.loads(getSubscriptionJson())
+            localCss = open("%s/launcher.css" % dirName, 'rb').read()
+            localJs = open("%s/launcher.js" % dirName, 'rb').read()
+            localHtml = open("%s/launcher.html" % dirName, 'rb').read()
+            subscriptionJson['guideWidgetData']['css'] = unicode(localCss)
+            subscriptionJson['guideWidgetData']['javascript'] = unicode(localJs)
+            subscriptionJson['guideWidgetData']['html'] = unicode(localHtml)
+            print putSubscription(json.dumps(subscriptionJson))
+            break
 def guideCheckout(guideId, jsonFilename):
     if jsonFilename:
         jsonFile = open(jsonFilename, 'r')
@@ -229,9 +275,15 @@ def main(args, loglevel):
   logging.basicConfig(format="%(levelname)s: %(message)s", level=loglevel)
 
   if args.action == "down" or args.action == "d":
-      guideCheckout(args.guide, args.json)
+      if args.launcher:
+          launcherDown()
+      else:
+          guideCheckout(args.guide, args.json)
   elif args.action == "up" or args.action == "u":
-      guideUpload(args.guide, args.d, args.m)
+      if args.launcher:
+          launcherUpload()
+      else:
+          guideUpload(args.guide, args.d, args.m)
   else:
     print "unrecognized action"
 
@@ -244,6 +296,10 @@ if __name__ == '__main__':
                       "action",
                       help = "Specify checkout or checkin action",
                       metavar = "ACTION")
+  parser.add_argument(
+                      "--launcher", '-l',
+                      help = "Launcher checkout/checkin",
+                      action = "store_true")
   parser.add_argument(
                       "--guide", '-g',
                       help = "Guide to checkout or checkin",
